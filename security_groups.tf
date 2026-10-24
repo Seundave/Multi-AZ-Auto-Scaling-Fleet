@@ -23,9 +23,9 @@ resource "aws_security_group" "alb" {
   #     cidr_blocks = [aws_security_group.ec2.id]
   #   }
 
-    tags = {
-      Name = "multi-az-alb-sg"
-    }
+  tags = {
+    Name = "multi-az-alb-sg"
+  }
 }
 
 # 2. Security Group for the Private Application EC2 Instances
