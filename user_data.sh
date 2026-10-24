@@ -7,9 +7,9 @@ exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
 echo "=== Starting User Data Bootstrap ==="
 
-# 1. Update system packages and install Git
+# 1. Update system packages and install prerequisites explicitly (Git + Curl)
 dnf update -y
-dnf install -y git
+dnf install -y git curl
 
 # 2. Install Node.js 22.x LTS via NodeSource repository
 curl -fsSL https://rpm.nodesource.com/setup_22.x | bash -
@@ -22,22 +22,20 @@ echo "NPM version: $(npm -v)"
 echo "Creating dedicated application user..."
 useradd -r -s /bin/false nodejs
 
-# 4. Clone the repository into /opt/app and assign ownership
+# 4. Define app directory, clone repository, and set ownership
 APP_DIR="/opt/multi-az-app"
 REPO_URL="https://github.com/Seundave/Multi-AZ-Auto-Scaling-Fleet.git"
 
 echo "Cloning repository from $REPO_URL..."
+mkdir -p "$APP_DIR"
 git clone "$REPO_URL" "$APP_DIR"
 
-# Assign ownership of the app directory to the non-root user
+# Assign ownership of the entire app directory to the non-root user
 chown -R nodejs:nodejs "$APP_DIR"
 
-# Navigate into the sub-folder where package.json lives
-cd "$APP_DIR/app"
-
-# 5. Install dependencies reproducibly using the lockfile (run as nodejs user)
-echo "Installing Node.js dependencies..."
-su -s /bin/bash -c "npm ci --production" nodejs
+# 5. Install dependencies reproducibly using the lockfile as the non-root 'nodejs' user
+echo "Installing Node.js dependencies as user 'nodejs'..."
+sudo -u nodejs bash -c "cd $APP_DIR/app && npm ci --production"
 
 # 6. Create a dedicated Systemd service file running as non-root user
 SERVICE_NAME="multi-az-fleet-monitor"
@@ -73,7 +71,7 @@ systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
 systemctl start "$SERVICE_NAME"
 
-# 8. Post-boot Health Check Verification Loop
+# 8. Post-boot Health Check Verification Loop (using explicit curl)
 echo "Verifying application health endpoint..."
 MAX_ATTEMPTS=12
 ATTEMPT=0
