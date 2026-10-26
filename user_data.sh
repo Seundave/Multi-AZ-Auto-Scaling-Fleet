@@ -1,13 +1,14 @@
 #!/bin/bash
-# Exit immediately if any command fails
+# Exit immediately on errors and catch pipeline failures
 set -e
+set -o pipefail
 
 # Redirect stdout and stderr to /var/log/user-data.log for debugging
 exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
 echo "=== Starting User Data Bootstrap ==="
 
-# 1. Update system packages and install prerequisites explicitly (Git + Curl)
+# 1. Update system packages and install explicit prerequisites (Git + Curl)
 dnf update -y
 dnf install -y git curl
 
@@ -22,22 +23,27 @@ echo "NPM version: $(npm -v)"
 echo "Creating dedicated application user..."
 useradd -r -s /bin/false nodejs
 
-# 4. Define app directory, clone repository, and set ownership
+# 4. Define app directory, clone repository, and checkout a consistent version
 APP_DIR="/opt/multi-az-app"
 REPO_URL="https://github.com/Seundave/Multi-AZ-Auto-Scaling-Fleet.git"
+REPO_BRANCH="main" # Change to a specific commit hash (e.g., 'a1b2c3d') if you want absolute version pinning
 
 echo "Cloning repository from $REPO_URL..."
 mkdir -p "$APP_DIR"
 git clone "$REPO_URL" "$APP_DIR"
 
-# Assign ownership of the entire app directory to the non-root user
+# Checkout the desired branch/commit for deterministic deployments
+cd "$APP_DIR"
+git checkout "$REPO_BRANCH"
+
+# Assign recursive ownership of the app directory to the non-root user
 chown -R nodejs:nodejs "$APP_DIR"
 
-# 5. Install dependencies reproducibly using the lockfile as the non-root 'nodejs' user
+# 5. Install dependencies reproducibly using the lockfile as the non-root 'nodejs' user via runuser
 echo "Installing Node.js dependencies as user 'nodejs'..."
-sudo -u nodejs bash -c "cd $APP_DIR/app && npm ci --production"
+runuser -u nodejs -- bash -c "cd $APP_DIR/app && npm ci --production"
 
-# 6. Create a dedicated Systemd service file running as non-root user
+# 6. Create a dedicated Systemd service file running as non-root user (relying on default journal logs)
 SERVICE_NAME="multi-az-fleet-monitor"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
@@ -55,8 +61,6 @@ WorkingDirectory=$APP_DIR/app
 ExecStart=/usr/bin/npm start
 Restart=always
 RestartSec=10
-StandardOutput=syslog
-StandardError=syslog
 SyslogIdentifier=$SERVICE_NAME
 Environment=NODE_ENV=production
 Environment=PORT=8080
@@ -71,7 +75,7 @@ systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
 systemctl start "$SERVICE_NAME"
 
-# 8. Post-boot Health Check Verification Loop (using explicit curl)
+# 8. Post-boot Health Check Verification Loop
 echo "Verifying application health endpoint..."
 MAX_ATTEMPTS=12
 ATTEMPT=0
