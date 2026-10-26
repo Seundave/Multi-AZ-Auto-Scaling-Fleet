@@ -52,7 +52,7 @@ resource "aws_lb_listener" "http" {
 }
 
 resource "aws_lb_target_group_attachment" "test_instance_attachment" {
-    target_group_arn = aws_lb_target_group.app_tg.arn
-    target_id        = aws_instance.test_app_instance.id
-    port             = 8080
+  target_group_arn = aws_lb_target_group.app_tg.arn
+  target_id        = aws_instance.test_app_instance.id
+  port             = 8080
 }
