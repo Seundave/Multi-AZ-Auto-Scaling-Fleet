@@ -10,7 +10,7 @@ echo "=== Starting User Data Bootstrap ==="
 
 # 1. Update system packages and install explicit prerequisites (Git + Curl)
 dnf update -y
-dnf install -y git curl
+dnf install -y git 
 
 # 2. Install Node.js 22.x LTS via NodeSource repository
 curl -fsSL https://rpm.nodesource.com/setup_22.x | bash -
