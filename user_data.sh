@@ -21,7 +21,7 @@ echo "NPM version: $(npm -v)"
 
 # 3. Create a dedicated non-root system user for security
 echo "Creating dedicated application user..."
-useradd -r -s /bin/false nodejs
+useradd -r -m -d /home/nodejs -s /bin/false nodejs
 
 # 4. Define app directory, clone repository, and checkout a consistent version
 APP_DIR="/opt/multi-az-app"
@@ -41,7 +41,7 @@ chown -R nodejs:nodejs "$APP_DIR"
 
 # 5. Install dependencies reproducibly using the lockfile as the non-root 'nodejs' user via runuser
 echo "Installing Node.js dependencies as user 'nodejs'..."
-runuser -u nodejs -- bash -c "cd $APP_DIR/app && npm ci --production"
+runuser -u nodejs -- env HOME=/home/nodejs bash -c "cd $APP_DIR/app && npm ci --production"
 
 # 6. Create a dedicated Systemd service file running as non-root user (relying on default journal logs)
 SERVICE_NAME="multi-az-fleet-monitor"
