@@ -19,6 +19,17 @@ resource "aws_autoscaling_group" "app_asg" {
     version = "$Latest"
   }
 
+  # Configure rolling instance refresh to update instances to the latest launch template version
+  instance_refresh {
+    strategy = "Rolling"
+    preferences {
+      min_healthy_percentage = 100
+      max_healthy_percentage = 150
+      instance_warmup        = 300 # Matches bootstrap/dependency installation window
+    }
+    # triggers = ["launch_template"]
+  }
+
   tag {
     key                 = "Name"
     value               = "multi-az-app-asg-instance"

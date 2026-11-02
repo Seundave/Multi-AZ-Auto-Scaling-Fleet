@@ -21,6 +21,11 @@ resource "aws_launch_template" "app_instance" {
     http_put_response_hop_limit = 1
   }
 
+  # Enable detailed monitoring (1-minute metrics intervals)
+  monitoring {
+    enabled = true
+  }
+
   # 5. Instance Tagging
   tag_specifications {
     resource_type = "instance"
