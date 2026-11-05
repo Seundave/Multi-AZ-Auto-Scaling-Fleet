@@ -19,6 +19,17 @@ resource "aws_autoscaling_group" "app_asg" {
     version = "$Latest"
   }
 
+  # Explicitly manage metrics collection in Terraform
+  metrics_granularity = "1Minute"
+  enabled_metrics = [
+    "GroupDesiredCapacity",
+    "GroupInServiceInstances",
+    "GroupPendingInstances",
+    "GroupTerminatingInstances",
+    "GroupTotalInstances",
+    "GroupMinSize"
+  ]
+
   # Configure rolling instance refresh to update instances to the latest launch template version
   instance_refresh {
     strategy = "Rolling"
