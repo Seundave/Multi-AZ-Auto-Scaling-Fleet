@@ -3,6 +3,19 @@ resource "aws_launch_template" "app_instance" {
   image_id      = "ami-06337f27770313698"
   instance_type = "t3.micro"
 
+
+  block_device_mappings {
+    device_name = "/dev/xvda"
+
+    ebs {
+      volume_size           = 8
+      volume_type           = "gp3"
+      encrypted             = true
+      delete_on_termination = true
+    }
+  }
+
+
   # 1. IAM Instance Profile for SSM Session Manager access
   iam_instance_profile {
     name = aws_iam_instance_profile.ec2_profile.name
