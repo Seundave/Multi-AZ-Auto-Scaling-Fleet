@@ -5,6 +5,7 @@ const {
 const { EC2Client, DescribeInstancesCommand } = require("@aws-sdk/client-ec2");
 const {
   ElasticLoadBalancingV2Client,
+  DescribeTargetHealthCommand,
 } = require("@aws-sdk/client-elastic-load-balancing-v2");
 
 // Initialize AWS service clients
@@ -12,7 +13,32 @@ const autoScalingClient = new AutoScalingClient({});
 const ec2Client = new EC2Client({});
 const elbv2Client = new ElasticLoadBalancingV2Client({});
 
+const validateEnvironment = () => {
+  const requiredVariables = ["ASG_NAME", "TARGET_GROUP_ARN"];
+
+  const missingVariables = requiredVariables.filter(
+    (variable) => !process.env[variable],
+  );
+
+  return missingVariables;
+};
+
 exports.handler = async (event) => {
+  const missingVariables = validateEnvironment();
+
+  if (missingVariables.length > 0) {
+    return {
+      statusCode: 500,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message: "Server configuration error",
+        missingVariables,
+      }),
+    };
+  }
+
   try {
     const result = await autoScalingClient.send(
       new DescribeAutoScalingGroupsCommand({
@@ -61,11 +87,37 @@ exports.handler = async (event) => {
 
     // console.log("asg Instances:", asgInstances);
 
+    const targetHealthResults = await elbv2Client.send(
+      new DescribeTargetHealthCommand({
+        TargetGroupArn: process.env.TARGET_GROUP_ARN,
+      }),
+    );
+
+    // console.log(
+    //   "Target Health Results:",
+    //   JSON.stringify(targetHealthResults, null, 2),
+    // );
+
+    const targetHealthDescriptions =
+      targetHealthResults.TargetHealthDescriptions || [];
+
+    const healthyTargets = targetHealthDescriptions.filter(
+      (target) => target.TargetHealth?.State === "healthy",
+    ).length;
+
+    // console.log("Healthy Targets:", healthyTargets);
+
+    const unhealthyTargets = targetHealthDescriptions.filter(
+      (target) => target.TargetHealth?.State === "unhealthy",
+    ).length;
+
     const fleet = {
       name: group.AutoScalingGroupName,
       minSize: group.MinSize,
       maxSize: group.MaxSize,
       desiredCapacity: group.DesiredCapacity,
+      healthyTargets,
+      unhealthyTargets,
       instances: ec2Instances.map((instance) => ({
         instanceId: instance.InstanceId,
         privateIp: instance.PrivateIpAddress,
@@ -76,7 +128,7 @@ exports.handler = async (event) => {
       })),
     };
 
-    // console.log("Fleet:", JSON.stringify(fleet, null, 2));
+    console.log("Fleet:", JSON.stringify(fleet, null, 2));
 
     return {
       statusCode: 200,
