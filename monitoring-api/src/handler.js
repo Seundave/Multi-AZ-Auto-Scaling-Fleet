@@ -2,7 +2,7 @@ const {
   AutoScalingClient,
   DescribeAutoScalingGroupsCommand,
 } = require("@aws-sdk/client-auto-scaling");
-const { EC2Client } = require("@aws-sdk/client-ec2");
+const { EC2Client, DescribeInstancesCommand } = require("@aws-sdk/client-ec2");
 const {
   ElasticLoadBalancingV2Client,
 } = require("@aws-sdk/client-elastic-load-balancing-v2");
@@ -22,6 +22,8 @@ exports.handler = async (event) => {
 
     const group = result.AutoScalingGroups[0];
 
+    // console.log(group,"group");
+
     if (!group) {
       return {
         statusCode: 404,
@@ -31,17 +33,50 @@ exports.handler = async (event) => {
       };
     }
 
+    const instanceIds = (group.Instances || []).map(
+      (instance) => instance.InstanceId,
+    );
+
+    // console.log("Instance IDs:", instanceIds);
+
+    const ec2Results =
+      instanceIds.length > 0
+        ? await ec2Client.send(
+            new DescribeInstancesCommand({ InstanceIds: instanceIds }),
+          )
+        : { Reservations: [] };
+
+    // console.log("EC2 Results:", JSON.stringify(ec2Results, null, 2));
+
+    const ec2Instances = (ec2Results.Reservations || []).flatMap(
+      (reservation) => reservation.Instances || [],
+    );
+
+    const asgInstances = new Map(
+      (group.Instances || []).map((instance) => [
+        instance.InstanceId,
+        instance,
+      ]),
+    );
+
+    // console.log("asg Instances:", asgInstances);
+
     const fleet = {
       name: group.AutoScalingGroupName,
       minSize: group.MinSize,
       maxSize: group.MaxSize,
       desiredCapacity: group.DesiredCapacity,
-      instances: (group.Instances || []).map((instance) => ({
+      instances: ec2Instances.map((instance) => ({
         instanceId: instance.InstanceId,
-        availabilityZone: instance.AvailabilityZone,
-        lifecycleState: instance.LifecycleState,
+        privateIp: instance.PrivateIpAddress,
+        instanceType: instance.InstanceType,
+        availabilityZone: instance.Placement?.AvailabilityZone,
+        ec2State: instance.State?.Name,
+        lifecycleState: asgInstances.get(instance.InstanceId)?.LifecycleState,
       })),
     };
+
+    // console.log("Fleet:", JSON.stringify(fleet, null, 2));
 
     return {
       statusCode: 200,
@@ -62,16 +97,3 @@ exports.handler = async (event) => {
     };
   }
 };
-
-// exports.handler = async (event) => {
-//   return {
-//     statusCode: 200,
-//     headers: {
-//       "Content-Type": "application/json",
-//     },
-//     body: JSON.stringify({
-//       message: "Fleet Monitoring API is running",
-//       status: "success",
-//     }),
-//   };
-// };
