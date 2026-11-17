@@ -28,3 +28,6 @@ venv/
 .DS_Store
 
 node_modules/
+
+# Lambda deployment packages
+*.zip

@@ -23,20 +23,22 @@ const validateEnvironment = () => {
   return missingVariables;
 };
 
+const createResponse = (statusCode, data) => ({
+  statusCode,
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify(data),
+});
+
 exports.handler = async (event) => {
   const missingVariables = validateEnvironment();
 
   if (missingVariables.length > 0) {
-    return {
-      statusCode: 500,
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        message: "Server configuration error",
-        missingVariables,
-      }),
-    };
+    return createResponse(500, {
+      message: "Server configuration error",
+      missingVariables,
+    });
   }
 
   try {
@@ -46,17 +48,14 @@ exports.handler = async (event) => {
       }),
     );
 
-    const group = result.AutoScalingGroups[0];
+    const group = result.AutoScalingGroups?.[0];
 
     // console.log(group,"group");
 
     if (!group) {
-      return {
-        statusCode: 404,
-        body: JSON.stringify({
-          message: "Auto Scaling Group not found",
-        }),
-      };
+      return createResponse(404, {
+        message: "Auto Scaling Group not found",
+      });
     }
 
     const instanceIds = (group.Instances || []).map(
@@ -128,24 +127,18 @@ exports.handler = async (event) => {
       })),
     };
 
-    console.log("Fleet:", JSON.stringify(fleet, null, 2));
+    // console.log("Fleet:", JSON.stringify(fleet, null, 2));
 
-    return {
-      statusCode: 200,
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(fleet),
-    };
+    return createResponse(200, fleet);
   } catch (error) {
-    console.log("Failed to retrieve Autoscaling group", error);
+    console.error("Failed to retrieve fleet information:", {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    });
 
-    return {
-      statusCode: 500,
-      body: JSON.stringify({
-        message: "Failed to retrieve Autoscaling group",
-        error: error.message,
-      }),
-    };
+    return createResponse(500, {
+      message: "Unable to retrieve fleet information",
+    });
   }
 };
