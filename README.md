@@ -354,18 +354,6 @@ The monitoring Lambda function does not need to run inside the application VPC. 
 
 Terraform was used to provision and manage the infrastructure, making the environment reproducible and allowing changes to be reviewed before deployment.
 
-## Future Improvements
-
-- Add CloudWatch CPU utilization metrics to the dashboard.
-- Visualize Auto Scaling activities and scaling events.
-- Add historical fleet metrics and charts.
-- Implement monitoring API authentication and authorization.
-- Improve API error handling and retry behavior.
-- Add dashboard resilience for failed API requests.
-- Implement HTTPS for the application endpoint using ACM and a domain.
-- Improve AZ-level resilience by introducing NAT Gateway redundancy.
-- Add automated testing and deployment pipelines using CI/CD.
-
 ## What I Learned
 
 This project provided practical experience in:
